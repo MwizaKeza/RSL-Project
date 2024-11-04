@@ -6,14 +6,11 @@ import tensorflow as tf
 import os
 import time
 
-# Initialize the Flask app
 app = Flask(__name__)
 
-# Load the model
 model = tf.keras.models.load_model('rsl_model_1.h5')
 DATA_PATH = 'RSL_Dataset'
 
-# Load actions list
 actions = []
 for category in os.listdir(DATA_PATH):
     category_path = os.path.join(DATA_PATH, category)
@@ -21,9 +18,8 @@ for category in os.listdir(DATA_PATH):
         sign_folders = [folder for folder in os.listdir(category_path) if os.path.isdir(os.path.join(category_path, folder))]
         actions.extend(sign_folders)
 actions = np.array(actions)
-print("Loaded actions list:", actions)  # Modify with your model's specific actions
+print("Loaded actions list:", actions)
 
-# Initialize Mediapipe holistic
 mp_holistic = mp.solutions.holistic
 
 sentence = ""
@@ -51,12 +47,11 @@ def is_hand_moving(sequence):
     if len(sequence) < 2:
         return False
     movement = np.sum(np.abs(sequence[-1] - sequence[-2]))
-    movement_threshold = 0.01  # Adjust this value based on your model's sensitivity
+    movement_threshold = 0.01
     return movement > movement_threshold
 
 @app.route('/')
 def index():
-    """Video streaming home page."""
     return render_template('index.html')
 
 def generate_frames():
@@ -70,10 +65,8 @@ def generate_frames():
             if not ret:
                 break
             
-            # Run Mediapipe model without drawing landmarks
             image, results = mediapipe_detection(frame, holistic)
             
-            # Extract keypoints and make predictions only if there is movement
             keypoints = extract_keypoints(results)
             sequence.append(keypoints)
             sequence = sequence[-30:]
@@ -87,22 +80,20 @@ def generate_frames():
                     if res[np.argmax(res)] > threshold:
                         detected_label = actions[np.argmax(res)]
                         
-                        if detected_label.isalpha() and len(detected_label) == 1:  # Letter detection
+                        if detected_label.isalpha() and len(detected_label) == 1:
                             is_spelling_word = True
                             sentence += detected_label
                             last_label_time = current_time
-                        else:  # Word detection
+                        else:
                             if not is_spelling_word or (is_spelling_word and (current_time - last_label_time > 3)):
                                 is_spelling_word = False
                                 sentence = detected_label
                                 last_label_time = current_time
 
-                # Clear the label after 3 seconds of inactivity
                 if current_time - last_label_time > 3:
                     sentence = ""
                     is_spelling_word = False
             
-            # Draw subtitles at the bottom of the video feed
             h, w, _ = image.shape
             cv2.rectangle(image, (0, h - 50), (w, h), (0, 0, 0), -1)
             cv2.putText(image, sentence, (w // 2 - len(sentence) * 10, h - 15), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
