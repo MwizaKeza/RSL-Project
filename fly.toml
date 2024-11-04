@@ -1,0 +1,20 @@
+# fly.toml app configuration file generated for rsl-project-solitary-field-6237 on 2024-11-04T03:01:49+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'rsl-project-solitary-field-6237'
+primary_region = 'jnb'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
