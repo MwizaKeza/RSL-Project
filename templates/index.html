@@ -2,49 +2,50 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Language Recognition</title>
+    <title>Rwandan Sign Language Recognition</title>
     <style>
         body {
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            flex-direction: column;
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            background-color: #222;
+            color: #fff;
             margin: 0;
             padding: 20px;
         }
+        h1 {
+            color: #fff;
+            margin-bottom: 20px;
+        }
         .video-container {
-            position: relative;
-            display: inline-block;
+            border: 5px solid #333;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            max-width: 100%;
+            overflow: hidden;
         }
-        #video-feed {
-            border: 2px solid #333;
-            border-radius: 10px;
-        }
-        .captions {
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
+        video, img {
             width: 100%;
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 8px 15px;
-            text-align: center;
+            display: block;
+        }
+        footer {
+            margin-top: 20px;
+            font-size: 0.9rem;
         }
     </style>
 </head>
 <body>
-    <h1>RSL Translator</h1>
+    <h1>Rwandan Sign Language Translator</h1>
     <div class="video-container">
-        <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Video Feed" width="800" height="600">
+        <img src="{{ url_for('video_feed') }}" alt="Live video feed">
     </div>
+    
 </body>
 </html>
+
 
 
 
