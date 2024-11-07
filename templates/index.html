@@ -2,9 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rwandan Sign Language Recognition</title>
+    <title>Rwandan Sign Language Translator</title>
     <style>
         body {
             display: flex;
@@ -27,7 +26,7 @@
             max-width: 100%;
             overflow: hidden;
         }
-        video, img {
+        video {
             width: 100%;
             display: block;
         }
@@ -40,11 +39,72 @@
 <body>
     <h1>Rwandan Sign Language Translator</h1>
     <div class="video-container">
-        <img src="{{ url_for('video_feed') }}" alt="Live video feed">
+        <video id="webcam" autoplay playsinline></video>
     </div>
-    
+    <script>
+        const videoElement = document.getElementById('webcam');
+        let sequence = [];
+
+        async function startWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoElement.srcObject = stream;
+                captureFrames();
+            } catch (error) {
+                console.error('Error accessing the webcam:', error);
+            }
+        }
+
+        async function captureFrames() {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+
+            const captureInterval = setInterval(() => {
+                if (videoElement.readyState === 4) {
+                    context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                    const frameData = context.getImageData(0, 0, canvas.width, canvas.height).data;
+
+                    // Preprocess data (simplified example)
+                    const normalizedFrame = Array.from(frameData).map(v => v / 255);  // Normalize pixel values
+                    sequence.push(normalizedFrame);
+                    if (sequence.length > 30) sequence.shift();  // Keep last 30 frames
+
+                    if (sequence.length === 30) {
+                        sendPrediction(sequence);
+                    }
+                }
+            }, 33); // Roughly 30 frames per second
+
+            function stopCapture() {
+                clearInterval(captureInterval);
+            }
+        }
+
+        async function sendPrediction(frames) {
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ frames: frames })
+                });
+
+                const result = await response.json();
+                console.log('Predicted Action:', result.action, 'Confidence:', result.confidence);
+            } catch (error) {
+                console.error('Error sending prediction:', error);
+            }
+        }
+
+        startWebcam();
+    </script>
 </body>
 </html>
+
+
 
 
 

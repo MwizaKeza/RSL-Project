@@ -1,14 +1,11 @@
-from flask import Flask, render_template, Response
-import cv2
+from flask import Flask, request, jsonify
 import numpy as np
-import mediapipe as mp
 import tensorflow as tf
 
-model = tf.keras.models.load_model('rsl_model_1.h5')
-
-mp_holistic = mp.solutions.holistic
-
 app = Flask(__name__)
+
+# Load your existing trained model
+model = tf.keras.models.load_model('rsl_model_1.h5')
 
 label_map = {
     'Amakuru yawe': 0, 'Muraho': 1, 'Murakoze': 2, 'Ni meza': 3, 'Nitwa': 4, 'Ntuye': 5, 'Ukora iki': 6,
@@ -20,74 +17,23 @@ label_map = {
 }
 
 actions = np.array(list(label_map.keys()))
+prediction_threshold = 0.5
 
-def mediapipe_detection(image, model):
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image.flags.writeable = False
-    results = model.process(image)
-    image.flags.writeable = True
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    return image, results
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        data = request.json['frames']
+        sequence = np.array(data).reshape(1, 30, -1)  # Reshape to expected input shape for the model
+        prediction = model.predict(sequence)[0]
 
-def extract_keypoints(results):
-    pose = np.array([[res.x, res.y, res.z, res.visibility] for res in results.pose_landmarks.landmark]).flatten() if results.pose_landmarks else np.zeros(33 * 4)
-    face = np.array([[res.x, res.y, res.z] for res in results.face_landmarks.landmark]).flatten() if results.face_landmarks else np.zeros(468 * 3)
-    lh = np.array([[res.x, res.y, res.z] for res in results.left_hand_landmarks.landmark]).flatten() if results.left_hand_landmarks else np.zeros(21 * 3)
-    rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten() if results.right_hand_landmarks else np.zeros(21 * 3)
-    return np.concatenate([pose, face, lh, rh])
-
-def generate_frames():
-    cap = cv2.VideoCapture(0)
-
-    if not cap.isOpened():
-        print("Error: Could not access the webcam.")
-        return
-
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    print(f"Webcam resolution: {width}x{height}")
-
-    sequence = []
-    prediction_threshold = 0.5
-
-    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                print("Failed to grab frame")
-                break
-
-            image, results = mediapipe_detection(frame, holistic)
-
-            keypoints = extract_keypoints(results)
-            sequence.append(keypoints)
-            sequence = sequence[-30:]
-
-            if len(sequence) == 30:
-                res = model.predict(np.expand_dims(sequence, axis=0))[0]
-                if np.max(res) > prediction_threshold:
-                    action = actions[np.argmax(res)]
-                    print(f"Predicted action: {action} with confidence {np.max(res):.2f}")
-
-                    cv2.rectangle(image, (0, height - 50), (width, height), (0, 0, 0), -1)
-                    cv2.putText(image, action, (10, height - 15), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-
-            ret, buffer = cv2.imencode('.jpg', image)
-            frame = buffer.tobytes()
-
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-        cap.release()
-        print("Video capture released.")
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/video_feed')
-def video_feed():
-    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+        if np.max(prediction) > prediction_threshold:
+            action = actions[np.argmax(prediction)]
+            confidence = float(np.max(prediction))
+            return jsonify({'action': action, 'confidence': confidence})
+        else:
+            return jsonify({'action': 'unknown', 'confidence': 0.0})
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 if __name__ == "__main__":
     app.run(debug=True)
