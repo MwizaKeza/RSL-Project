@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rwandan Sign Language Translator</title>
+    <title>Rwandan Sign Language Recognition</title>
     <style>
         body {
             display: flex;
@@ -21,18 +22,25 @@
             margin-bottom: 20px;
         }
         .video-container {
+            position: relative;
             border: 5px solid #333;
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
             max-width: 100%;
             overflow: hidden;
         }
-        video {
+        video, canvas {
             width: 100%;
             display: block;
         }
-        footer {
-            margin-top: 20px;
-            font-size: 0.9rem;
+        #subtitle {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            text-align: center;
+            font-size: 1.5em;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 5px;
         }
     </style>
 </head>
@@ -40,72 +48,54 @@
     <h1>Rwandan Sign Language Translator</h1>
     <div class="video-container">
         <video id="webcam" autoplay playsinline></video>
+        <canvas id="capture" style="display:none;"></canvas>
+        <div id="subtitle">Waiting for prediction...</div>
     </div>
+
     <script>
-        const videoElement = document.getElementById('webcam');
-        let sequence = [];
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('capture');
+        const context = canvas.getContext('2d');
+        const subtitle = document.getElementById('subtitle');
 
         async function startWebcam() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                videoElement.srcObject = stream;
-                captureFrames();
-            } catch (error) {
-                console.error('Error accessing the webcam:', error);
+                video.srcObject = stream;
+            } catch (err) {
+                console.error("Error accessing the webcam: ", err);
+                subtitle.textContent = "Error accessing the webcam.";
             }
         }
 
-        async function captureFrames() {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = videoElement.videoWidth;
-            canvas.height = videoElement.videoHeight;
-
-            const captureInterval = setInterval(() => {
-                if (videoElement.readyState === 4) {
-                    context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-                    const frameData = context.getImageData(0, 0, canvas.width, canvas.height).data;
-
-                    // Preprocess data (simplified example)
-                    const normalizedFrame = Array.from(frameData).map(v => v / 255);  // Normalize pixel values
-                    sequence.push(normalizedFrame);
-                    if (sequence.length > 30) sequence.shift();  // Keep last 30 frames
-
-                    if (sequence.length === 30) {
-                        sendPrediction(sequence);
-                    }
-                }
-            }, 33); // Roughly 30 frames per second
-
-            function stopCapture() {
-                clearInterval(captureInterval);
-            }
-        }
-
-        async function sendPrediction(frames) {
-            try {
-                const response = await fetch('/predict', {
+        video.addEventListener('play', () => {
+            setInterval(() => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const frame = canvas.toDataURL('image/jpeg');
+                // Send the captured frame to the server
+                fetch('/process_frame', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ frames: frames })
+                    body: JSON.stringify({ image: frame }),
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.action) {
+                        subtitle.textContent = `Predicted: ${data.action} (Confidence: ${(data.confidence * 100).toFixed(2)}%)`;
+                    } else if (data.message) {
+                        subtitle.textContent = data.message;
+                    }
+                })
+                .catch(err => {
+                    console.error("Error processing the frame: ", err);
+                    subtitle.textContent = "Error processing the frame.";
                 });
-
-                const result = await response.json();
-                console.log('Predicted Action:', result.action, 'Confidence:', result.confidence);
-            } catch (error) {
-                console.error('Error sending prediction:', error);
-            }
-        }
+            }, 100);
+        });
 
         startWebcam();
     </script>
 </body>
 </html>
-
-
-
-
-
-
