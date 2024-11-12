@@ -6,7 +6,7 @@ import tensorflow as tf
 import base64
 import re
 
-model = tf.keras.models.load_model('rsl_model_1.h5')
+model = tf.keras.models.load_model('rsl_model_4.h5')
 
 mp_holistic = mp.solutions.holistic
 
